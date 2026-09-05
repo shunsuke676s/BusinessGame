@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid,
   Tooltip, Legend, ResponsiveContainer, ReferenceLine,
@@ -32,6 +32,10 @@ const LEAD_TIME = 3; // 通常発注のリードタイム（発注から入荷�
 const EMERGENCY_LEAD_TIME = 1; // 緊急発注のリードタイム（翌日入荷）
 const EMERGENCY_MULTIPLIER = 1.2; // 緊急発注の割増率（仕入原価の1.2倍）
 const STORAGE_RATE = 2; // 1本・1日あたりの保管費（在庫量が多いほど総額が上がる）
+const ADSENSE_CLIENT = "ca-pub-5157428118387471";
+// AdSense管理画面で作成した広告ユニットのスロットID
+const AD_SLOT_HOME = "7651172534";
+const AD_SLOT_SETTLEMENT = "5852829537";
 const SAVE_KEY = "beverage-trade-save-v1"; // 中断データの保存キー
 
 function saveGameState(state) {
@@ -66,6 +70,33 @@ function hasSavedGameState() {
   } catch {
     return false;
   }
+}
+
+/* ============================================================
+   AdSense 広告表示用の共通コンポーネント
+   ============================================================ */
+function AdBanner({ slot, style }) {
+  useEffect(() => {
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch {
+      // AdSenseスクリプトが未読み込み・審査未通過の場合は何もしない
+    }
+  }, [slot]);
+
+  return (
+    <div className="ad-slot">
+      <span className="ad-slot-label">広告</span>
+      <ins
+        className="adsbygoogle"
+        style={{ display: "block", ...style }}
+        data-ad-client={ADSENSE_CLIENT}
+        data-ad-slot={slot}
+        data-ad-format="auto"
+        data-full-width-responsive="true"
+      />
+    </div>
+  );
 }
 
 function fixedCostsFor(productCount) {
@@ -158,6 +189,7 @@ export default function BusinessGame() {
   const [retainedEarnings, setRetainedEarnings] = useState(0);
   const [capitalStock, setCapitalStock] = useState(0);
   const [lastSettlement, setLastSettlement] = useState(null);
+  const [showSettlementAd, setShowSettlementAd] = useState(false);
 
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState({}); // { [productId]: lots }
@@ -370,6 +402,7 @@ export default function BusinessGame() {
     setRetainedEarnings(newRetained);
     setMonthlyRecords((prev) => [...prev, settlement]);
     setLastSettlement(settlement);
+    setShowSettlementAd(true);
     setScreen("settlement");
   };
 
@@ -475,7 +508,10 @@ export default function BusinessGame() {
       {screen === "help" && (
         <HelpScreen onBack={() => setScreen(helpReturnScreen)} />
       )}
-      {screen === "settlement" && lastSettlement && (
+      {screen === "settlement" && lastSettlement && showSettlementAd && (
+        <SettlementAdOverlay onContinue={() => setShowSettlementAd(false)} />
+      )}
+      {screen === "settlement" && lastSettlement && !showSettlementAd && (
         <SettlementScreen
           settlement={lastSettlement}
           isFinalMonth={currentMonth >= months}
@@ -532,6 +568,23 @@ export default function BusinessGame() {
 /* ============================================================
    ホーム画面
    ============================================================ */
+/* ============================================================
+   決算画面遷移時の広告オーバーレイ
+   ============================================================ */
+function SettlementAdOverlay({ onContinue }) {
+  return (
+    <div className="modal-overlay">
+      <div className="modal-box settlement-ad-box">
+        <h2>決算処理中…</h2>
+        <AdBanner slot={AD_SLOT_SETTLEMENT} style={{ minHeight: 250 }} />
+        <button className="btn primary big" onClick={onContinue}>
+          決算結果を見る
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart, onShowHelp, hasSavedGame, onResume }) {
   return (
     <div className="screen home-screen">
@@ -589,6 +642,7 @@ function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart,
         開業する
       </button>
       {hasSavedGame && <p className="resume-warning">新しく開業すると、中断中のデータは失われます。</p>}
+      <AdBanner slot={AD_SLOT_HOME} />
     </div>
   );
 }
@@ -1208,6 +1262,10 @@ const STYLE = `
 .modal-overlay { position: fixed; inset: 0; background: rgba(20,24,28,0.5); display: flex; align-items: center; justify-content: center; z-index: 50; padding: 16px; }
 .modal-box { background: var(--sheet); border: 1px solid var(--line); border-radius: 16px; padding: 22px; width: 100%; max-width: 480px; font-family: 'Inter', sans-serif; max-height: 90vh; overflow-y: auto; }
 .modal-box.small { max-width: 360px; }
+.settlement-ad-box { text-align: center; }
+.settlement-ad-box .btn { margin-top: 16px; }
+.ad-slot { margin: 16px 0; text-align: center; }
+.ad-slot-label { display: block; font-size: 10px; color: var(--ink-secondary); margin-bottom: 4px; letter-spacing: 1px; }
 .order-lead-note { font-size: 12px; color: var(--ink-secondary); margin: -4px 0 12px; line-height: 1.6; }
 .order-rows { display: flex; flex-direction: column; gap: 10px; margin-bottom: 10px; }
 .order-row { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; }
