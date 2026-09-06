@@ -192,7 +192,7 @@ function generateIncomingOrders(products, trust, conf) {
    メインコンポーネント
    ============================================================ */
 export default function BusinessGame() {
-  const [screen, setScreen] = useState("home"); // home | game | settlement | end
+  const [screen, setScreen] = useState("home"); // home | game | settlement | end | help | leaderboard
   const [hasSavedGame, setHasSavedGame] = useState(() => hasSavedGameState());
   const [difficulty, setDifficulty] = useState("初級");
   const [duration, setDuration] = useState(3);
@@ -536,6 +536,7 @@ export default function BusinessGame() {
           onShowHelp={() => openHelp("home")}
           hasSavedGame={hasSavedGame}
           onResume={resumeGame}
+          onShowLeaderboard={() => setScreen("leaderboard")}
         />
       )}
       {screen === "game" && (
@@ -563,6 +564,9 @@ export default function BusinessGame() {
       )}
       {screen === "help" && (
         <HelpScreen onBack={() => setScreen(helpReturnScreen)} />
+      )}
+      {screen === "leaderboard" && (
+        <LeaderboardScreen onBack={() => setScreen("home")} />
       )}
       {screen === "settlement" && lastSettlement && showSettlementAd && (
         <SettlementAdOverlay onContinue={() => setShowSettlementAd(false)} />
@@ -650,7 +654,7 @@ function SettlementAdOverlay({ onContinue }) {
   );
 }
 
-function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart, onShowHelp, hasSavedGame, onResume }) {
+function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart, onShowHelp, hasSavedGame, onResume, onShowLeaderboard }) {
   return (
     <div className="screen home-screen">
       <div className="ledger-header">
@@ -707,6 +711,9 @@ function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart,
         開業する
       </button>
       {hasSavedGame && <p className="resume-warning">新しく開業すると、中断中のデータは失われます。</p>}
+      <button className="btn ghost big" onClick={onShowLeaderboard}>
+        ランキングを見る
+      </button>
       <p className="guide-link"><a href="/guide.html">遊び方ガイド・開発の背景を読む</a></p>
       <AdBanner slot={AD_SLOT_HOME} />
     </div>
@@ -1023,6 +1030,98 @@ function ConfirmModal({ confirmModal, products, todayOrders, orderDraft, orderEm
 /* ============================================================
    説明画面（ルール・操作説明）
    ============================================================ */
+/* ============================================================
+   ランキング画面（難易度・営業期間を選んで上位を閲覧）
+   ============================================================ */
+function LeaderboardScreen({ onBack }) {
+  const [difficulty, setDifficulty] = useState("初級");
+  const [months, setMonths] = useState(3);
+  const [status, setStatus] = useState("loading"); // loading | done | error
+  const [leaderboard, setLeaderboard] = useState([]);
+  const [errorMessage, setErrorMessage] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    setStatus("loading");
+    fetch(`/api/leaderboard?difficulty=${encodeURIComponent(difficulty)}&months=${months}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (cancelled) return;
+        if (!data.success) throw new Error(data.error || "取得に失敗しました");
+        setLeaderboard(data.leaderboard || []);
+        setStatus("done");
+      })
+      .catch((e) => {
+        if (cancelled) return;
+        setErrorMessage(e.message || "通信エラーが発生しました");
+        setStatus("error");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [difficulty, months]);
+
+  return (
+    <div className="screen leaderboard-screen">
+      <h1>ランキング</h1>
+
+      <div className="panel">
+        <h2>難易度</h2>
+        <div className="view-toggle">
+          {Object.keys(DIFFICULTIES).map((key) => (
+            <button
+              key={key}
+              className={`toggle-btn ${difficulty === key ? "active" : ""}`}
+              onClick={() => setDifficulty(key)}
+            >
+              {key}
+            </button>
+          ))}
+        </div>
+        <h2 style={{ marginTop: 20 }}>営業期間</h2>
+        <div className="view-toggle">
+          {DURATIONS.map((m) => (
+            <button
+              key={m}
+              className={`toggle-btn ${months === m ? "active" : ""}`}
+              onClick={() => setMonths(m)}
+            >
+              {m}カ月
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="panel">
+        <h2>{difficulty}・{months}カ月 トップ10</h2>
+        {status === "loading" && <p className="ranking-note">読み込み中…</p>}
+        {status === "error" && <div className="decision-result warn">{errorMessage}</div>}
+        {status === "done" && leaderboard.length === 0 && (
+          <p className="ranking-note">まだ登録がありません。最初の1人になりましょう。</p>
+        )}
+        {status === "done" && leaderboard.length > 0 && (
+          <table className="statement-table ranking-table">
+            <thead>
+              <tr><th>順位</th><th>名前</th><th>純資産</th></tr>
+            </thead>
+            <tbody>
+              {leaderboard.map((row, i) => (
+                <tr key={i}>
+                  <td>{i + 1}</td>
+                  <td>{row.name}</td>
+                  <td>{yen(row.score)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      <button className="btn primary big" onClick={onBack}>戻る</button>
+    </div>
+  );
+}
+
 function HelpScreen({ onBack }) {
   return (
     <div className="screen help-screen">
