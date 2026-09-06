@@ -118,26 +118,31 @@ function yen(n) {
    シード化乱数生成器（mulberry32）
    ランキングのリプレイ検証のため、ゲーム中の乱数はすべてこの生成器経由にする。
    同じシード値であれば、クライアント・サーバーで完全に同じ乱数列が再現できる。
+   内部状態(rngState.s)を外に取り出せるようにしておき、「中断→再開」の際に
+   途中経過から正しく乱数列を継続できるようにする（でないとリプレイ検証が壊れる）。
    ============================================================ */
-function createRng(seed) {
-  let s = seed >>> 0;
-  return function () {
-    s |= 0;
-    s = (s + 0x6d2b79f5) | 0;
-    let t = Math.imul(s ^ (s >>> 15), 1 | s);
-    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
-    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-  };
+const rngState = { s: 0 };
+
+function seedRng(seed) {
+  rngState.s = seed >>> 0;
+}
+
+function nextRandom() {
+  let s = rngState.s;
+  s |= 0;
+  s = (s + 0x6d2b79f5) | 0;
+  let t = Math.imul(s ^ (s >>> 15), 1 | s);
+  t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+  rngState.s = s;
+  return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
 }
 
 function makeSeed() {
   return Math.floor(Math.random() * 0xffffffff);
 }
 
-let currentRng = Math.random; // ゲーム開始時に createRng(seed) へ差し替える
-
 function randInt(min, max) {
-  return Math.floor(currentRng() * (max - min + 1)) + min;
+  return Math.floor(nextRandom() * (max - min + 1)) + min;
 }
 
 function roundTo10(n) {
@@ -152,7 +157,7 @@ function toLots(raw) {
 function shuffle(arr) {
   const a = [...arr];
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(currentRng() * (i + 1));
+    const j = Math.floor(nextRandom() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -221,7 +226,6 @@ export default function BusinessGame() {
   const [stockThresholds, setStockThresholds] = useState({}); // { [productId]: number } 在庫基準量
   const [gameSeed, setGameSeed] = useState(null);
   const [actionLog, setActionLog] = useState([]); // ランキングのリプレイ検証用の操作ログ
-  const [rankingSubmitted, setRankingSubmitted] = useState(false);
   const [pendingPurchaseLog, setPendingPurchaseLog] = useState([]); // 当日発注した内容を一時的に蓄積
 
   const openHelp = (from) => {
@@ -234,10 +238,9 @@ export default function BusinessGame() {
   /* ---------- ホーム画面からゲーム開始 ---------- */
   const startGame = () => {
     const seed = makeSeed();
-    currentRng = createRng(seed);
+    seedRng(seed);
     setGameSeed(seed);
     setActionLog([]);
-    setRankingSubmitted(false);
     setPendingPurchaseLog([]);
     const initProducts = buildProducts(difficulty);
     const initialInventoryValue = initProducts.reduce((s, p) => s + p.stock * p.cost, 0);
@@ -486,6 +489,7 @@ export default function BusinessGame() {
       difficulty, duration, months, currentMonth, day, totalDay,
       cash, trust, products, pendingArrivals, todayOrders, dailyLog,
       monthlyRecords, retainedEarnings, capitalStock, stockThresholds,
+      gameSeed, actionLog, pendingPurchaseLog, rngS: rngState.s,
     };
     saveGameState(snapshot);
     setHasSavedGame(true);
@@ -512,6 +516,16 @@ export default function BusinessGame() {
     setRetainedEarnings(saved.retainedEarnings);
     setCapitalStock(saved.capitalStock);
     setStockThresholds(saved.stockThresholds || {});
+    setGameSeed(saved.gameSeed);
+    setActionLog(saved.actionLog || []);
+    setPendingPurchaseLog(saved.pendingPurchaseLog || []);
+    // 乱数生成器の内部状態を保存時点から正確に復元する（でないとランキングのリプレイ検証と結果がずれてしまう）
+    if (typeof saved.rngS === "number") {
+      rngState.s = saved.rngS;
+    } else if (typeof saved.gameSeed === "number") {
+      // 古いセーブデータ（乱数状態を保存する前のバージョン）との互換性維持のためのフォールバック
+      seedRng(saved.gameSeed);
+    }
     setScreen("game");
   };
 
