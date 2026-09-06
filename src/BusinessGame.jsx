@@ -1366,13 +1366,13 @@ function EndScreen({ monthlyRecords, onRestart, difficulty, months, gameSeed, ac
               サーバー側でプレイ内容を再計算し、正式な最終純資産としてランキングに登録します。
             </p>
             <div className="field">
-              <label>表示名（20文字まで）</label>
+              <label>ランキングに表示する名前を入力してください（20文字まで）</label>
               <input
                 type="text"
                 maxLength={20}
                 value={playerName}
                 onChange={(e) => setPlayerName(e.target.value)}
-                placeholder="例: しゅん"
+                placeholder="ここに名前を入力（例: Bob）"
               />
             </div>
             {submitState === "error" && <div className="decision-result warn">{errorMessage}</div>}
@@ -1564,6 +1564,14 @@ const STYLE = `
 
 .summary-panel .slip-row { font-size: 14px; }
 .ranking-note { font-size: 12px; color: var(--ink-secondary); margin: -4px 0 12px; line-height: 1.6; }
+.field { margin-bottom: 16px; display: flex; flex-direction: column; gap: 6px; }
+.field label { font-size: 13px; font-weight: 600; color: var(--ink); }
+.field input {
+  font-family: inherit; font-size: 16px; padding: 12px 14px;
+  border: 2px solid var(--line); border-radius: 12px; background: var(--sheet); color: var(--ink);
+}
+.field input:focus { border-color: var(--green); outline: none; }
+.field input::placeholder { color: #A6ABB0; }
 .ranking-table { margin-top: 12px; }
 .ranking-table th:first-child, .ranking-table td:first-child { width: 40px; }
 .ranking-table tr.ranking-me td { font-weight: 700; color: var(--green-strong); }
