@@ -216,7 +216,6 @@ export default function BusinessGame() {
   const [retainedEarnings, setRetainedEarnings] = useState(0);
   const [capitalStock, setCapitalStock] = useState(0);
   const [lastSettlement, setLastSettlement] = useState(null);
-  const [showSettlementAd, setShowSettlementAd] = useState(false);
 
   const [orderModalOpen, setOrderModalOpen] = useState(false);
   const [orderDraft, setOrderDraft] = useState({}); // { [productId]: lots }
@@ -461,7 +460,6 @@ export default function BusinessGame() {
     setRetainedEarnings(newRetained);
     setMonthlyRecords((prev) => [...prev, settlement]);
     setLastSettlement(settlement);
-    setShowSettlementAd(true);
     setScreen("settlement");
   };
 
@@ -582,10 +580,7 @@ export default function BusinessGame() {
       {screen === "leaderboard" && (
         <LeaderboardScreen onBack={() => setScreen("home")} />
       )}
-      {screen === "settlement" && lastSettlement && showSettlementAd && (
-        <SettlementAdOverlay onContinue={() => setShowSettlementAd(false)} />
-      )}
-      {screen === "settlement" && lastSettlement && !showSettlementAd && (
+      {screen === "settlement" && lastSettlement && (
         <SettlementScreen
           settlement={lastSettlement}
           isFinalMonth={currentMonth >= months}
@@ -651,23 +646,6 @@ export default function BusinessGame() {
 /* ============================================================
    ホーム画面
    ============================================================ */
-/* ============================================================
-   決算画面遷移時の広告オーバーレイ
-   ============================================================ */
-function SettlementAdOverlay({ onContinue }) {
-  return (
-    <div className="modal-overlay">
-      <div className="modal-box settlement-ad-box">
-        <h2>決算処理中…</h2>
-        <AdBanner slot={AD_SLOT_SETTLEMENT} style={{ minHeight: 250 }} />
-        <button className="btn primary big" onClick={onContinue}>
-          決算結果を見る
-        </button>
-      </div>
-    </div>
-  );
-}
-
 function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart, onShowHelp, hasSavedGame, onResume, onShowLeaderboard }) {
   return (
     <div className="screen home-screen">
@@ -676,6 +654,21 @@ function HomeScreen({ difficulty, setDifficulty, duration, setDuration, onStart,
         <h1>ビジネスゲーム<span className="title-sub">〜飲料販売〜</span></h1>
         <p className="subtitle">発注と受注を見極め、30日ごとの決算を乗り切れ。</p>
         <button className="btn ghost help-btn" onClick={onShowHelp}>遊び方・ルール説明</button>
+      </div>
+
+      <div className="panel about-panel">
+        <h2>このゲームについて</h2>
+        <p>
+          「ビジネスゲーム 〜飲料販売〜」は、飲料の卸商を経営する無料の経営シミュレーションゲームです。
+          商品を発注して在庫を確保しつつ、毎日届く注文を受けるかどうかを判断し、30日間の営業を乗り切って
+          利益を出すことを目指します。損益計算書や貸借対照表もきちんと成り立つように作られており、
+          実際の商売に近い駆け引きを、ブラウザだけで気軽に体験できます。
+        </p>
+        <p>
+          在庫を抱えすぎれば保管費がかさみ、注文を見送り続ければ取引先からの信用を失う——
+          そうしたジレンマの中で、限られた資金をどう活かすかがこのゲームの醍醐味です。
+          難易度は3段階、営業期間も3〜12カ月から選べるので、初めての方でもじっくり基本を覚えられます。
+        </p>
       </div>
 
       {hasSavedGame && (
@@ -1298,6 +1291,8 @@ function SettlementScreen({ settlement, isFinalMonth, onNext }) {
           </table>
         </div>
       </div>
+
+      <AdBanner slot={AD_SLOT_SETTLEMENT} />
 
       <button className="btn primary big" onClick={onNext}>
         {isFinalMonth ? "最終決算を締める" : "次の月へ"}
